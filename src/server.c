@@ -203,10 +203,13 @@ int send_response(int fd, char *header, char *content_type, char *body)
   int response_length; // Total length of header plus body
 
   // !!!!  IMPLEMENT ME
-  // time_t t2 = time(NULL);
-  // struct tm *ltime2 = localtime(&t2);
+  time_t current_time = time(NULL);
+  struct tm *local_time = localtime(&current_time);
+  char *time_stamp = asctime(local_time);
 
-  response_length = sprintf(response, "%s\nDate:\nConnection: close\nContent-Length: %lu\nContent-Type: %s\n\n%s", header, strlen(body), content_type, body);
+  // printf("date: %s", date);
+
+  response_length = sprintf(response, "%s\nContent-Length: %lu\nContent-Type: %s\nDate: %sConnection: close\n\n%s", header, strlen(body), content_type, time_stamp, body);
 
   // Send it all!
   int rv = send(fd, response, response_length, 0);
@@ -234,7 +237,7 @@ void get_root(int fd)
   // !!!! IMPLEMENT ME
   //send_response(...
   // fd = 5;
-  char *body = "<h1>Hello, world!</h1>";
+  char *body = "<h1>Hello, world!</h1>\n";
   send_response(fd, "HTTP/1.1 200 OK", "text/html", body);
 }
 
@@ -247,7 +250,7 @@ void get_d20(int fd)
 
   srand(time(NULL));
 
-  char *body[5];
+  char body[5];
   sprintf(body, "%d\n", (rand() % 20) + 1);
 
   send_response(fd, "HTTP/1.1 200 OK", "text/plain", body);
@@ -259,12 +262,13 @@ void get_d20(int fd)
 void get_date(int fd)
 {
   // !!!! IMPLEMENT ME
-  time_t t1 = time(NULL);
-  struct tm *ltime = localtime(&t1);
+  time_t current_time = time(NULL);
+  struct tm *local_time = localtime(&current_time);
+  char *time_stamp = asctime(local_time);
 
   char body[150];
 
-  sprintf(body, "%s", asctime(ltime));
+  sprintf(body, "%s", time_stamp); // asctime turns time into str
 
   send_response(fd, "HTTP/1.1 200 OK", "text/plain", body);
 }
@@ -305,6 +309,7 @@ void handle_http_request(int fd)
   char request_path[1024];    // /info etc.
   char request_protocol[128]; // HTTP/1.1
 
+  char *body = p;
   // Read request
   int bytes_recvd = recv(fd, request, request_buffer_size - 1, 0);
 
@@ -316,7 +321,7 @@ void handle_http_request(int fd)
 
   // NUL terminate request string
   request[bytes_recvd] = '\0';
-  // !!!! IMPLEMENT ME
+
   // Get the request type and path from the first line
   // Hint: sscanf()!
   sscanf(request, "%s %s %s", request_type, request_path, request_protocol);
@@ -330,25 +335,43 @@ void handle_http_request(int fd)
 
   // !!!! IMPLEMENT ME
   // call the appropriate handler functions, above, with the incoming data
-
-  if (strcmp(request_path, "/") == 0)
+  if (strcmp(request_type, "GET") == 0)
   {
-    printf("Request for root path\n");
-    get_root(fd);
+    if (strcmp(request_path, "/") == 0)
+    {
+      printf("Request for root path\n");
+      get_root(fd);
+    }
+    else if (strcmp(request_path, "/d20") == 0)
+    {
+      printf("Request for /d20\n");
+      get_d20(fd);
+    }
+    else if (strcmp(request_path, "/date") == 0)
+    {
+      printf("Request for /date\n");
+      get_date(fd);
+    }
+    else
+    {
+      resp_404(fd);
+    }
   }
-  else if (strcmp(request_path, "/d20") == 0)
+  else if (strcmp(request_type, "POST") == 0)
   {
-    printf("Request for /d20\n");
-    get_d20(fd);
-  }
-  else if (strcmp(request_path, "/date") == 0)
-  {
-    printf("Request for /date\n");
-    get_date(fd);
+    if (strcmp(request_path, "/save") == 0)
+    {
+      printf("Request for /save\n");
+      post_save(fd, body);
+    }
+    else
+    {
+      resp_404(fd);
+    }
   }
   else
   {
-    resp_404(fd);
+    printf("The reqest_type: \"%s\"\n is unknow", request_type);
   }
 }
 
